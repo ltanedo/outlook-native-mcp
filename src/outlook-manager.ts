@@ -660,6 +660,7 @@ export class OutlookManager {
     try {
       const endDate = options.endDate || options.startDate;
       const calendarName = options.calendar || '';
+      const escapedCalendarName = calendarName.replace(/"/g, '""');
       
       const script = `
         try {
@@ -671,19 +672,24 @@ export class OutlookManager {
           ${calendarName ? `
           $calendar = $null
           foreach ($folder in $namespace.Folders) {
-            if ($folder.Name -eq "${calendarName.replace(/"/g, '""')}") {
-              $calendar = $folder.Folders("Calendar")
+            $displayName = "$($folder.Name) - Calendar"
+            if ($folder.Name -eq "${escapedCalendarName}" -or $displayName -eq "${escapedCalendarName}") {
+              try {
+                $calendar = $folder.Folders.Item("Calendar")
+              } catch {
+                $calendar = $null
+              }
               break
             }
           }
-          if (-not $calendar) { throw "Calendar not found: ${calendarName.replace(/"/g, '""')}" }
+          if (-not $calendar) { throw "Calendar not found: ${escapedCalendarName}" }
           ` : `
           $calendar = $namespace.GetDefaultFolder(9)
           `}
           
           # Create filter for date range
           $startDate = [DateTime]"${options.startDate.toISOString()}"
-          $endDate = [DateTime]"${endDate.toISOString()}".AddDays(1)
+          $endDate = ([DateTime]"${endDate.toISOString()}").AddDays(1)
           $filter = "[Start] >= '$($startDate.ToString('g'))' AND [End] <= '$($endDate.ToString('g'))'"
           
           # Get events
